@@ -5,31 +5,27 @@ require('dotenv').config();
 
 const app = express();
 
-// 1. Middleware
-app.use(cors({
-    origin: 'https://bytex-smart-ledger-n14n.vercel.app', // Your Vercel frontend
-    credentials: true
-}));
+// Global Middleware
+app.use(cors());
 app.use(express.json());
 
-// 2. Database Connection (using your Neon string)
+// Log incoming requests to verify the server is actually receiving them
+app.use((req, res, next) => {
+    console.log(`${req.method} request to ${req.url}`);
+    next();
+});
+
+// Database
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false } // Required for Neon/Render
+    ssl: { rejectUnauthorized: false }
 });
 
-// 3. Health Check Route (for debugging)
-app.get('/health', async (req, res) => {
-    try {
-        await pool.query('SELECT 1');
-        res.json({ status: 'ok', database: 'connected' });
-    } catch (err) {
-        res.status(500).json({ status: 'error', message: err.message });
-    }
+// Routes
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'OK', message: 'Server is healthy' });
 });
 
-// 4. API Endpoints
-// Get all transactions
 app.get('/api/transactions', async (req, res) => {
     try {
         const { rows } = await pool.query('SELECT * FROM transactions ORDER BY created_at DESC');
@@ -39,7 +35,6 @@ app.get('/api/transactions', async (req, res) => {
     }
 });
 
-// Add a transaction
 app.post('/api/transactions', async (req, res) => {
     const { description, amount, type } = req.body;
     try {
@@ -51,6 +46,12 @@ app.post('/api/transactions', async (req, res) => {
     }
 });
 
-// 5. Start Server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Default route to confirm the server is working at all
+app.get('/', (req, res) => {
+    res.send('Server is up and running!');
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is LIVE on port ${PORT}`);
+});

@@ -1,197 +1,160 @@
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Plus, Activity } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
-export default function App() {
-    const [data, setData] = useState({ transactions: [], summary: { income: 0, expense: 0, balance: 0 } });
-    const [formData, setFormData] = useState({ type: 'expense', amount: '', category: '', description: '' });
+// Your live Render Backend URL
+const API_URL = 'https://bytex-backend-9clz.onrender.com/api/transactions';
 
-    const fetchData = async () => {
-        try {
-            const res = await fetch('http://localhost:5000/api/transactions');
-            if (!res.ok) throw new Error("Network response was not ok");
-            const result = await res.json();
-            setData(result);
-        } catch (error) {
-            console.error("Failed to load ledger data", error);
-        }
+function App() {
+  const [transactions, setTransactions] = useState([]);
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [type, setType] = useState('income');
+
+  // Fetch transactions when the app loads
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const fetchTransactions = async () => {
+    try {
+      const response = await axios.get(API_URL);
+      setTransactions(response.data);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!description || !amount) return;
+
+    const newTransaction = {
+      description,
+      amount: Number(amount),
+      type
     };
 
-    useEffect(() => { 
-        fetchData(); 
-    }, []);
+    try {
+      await axios.post(API_URL, newTransaction);
+      setDescription('');
+      setAmount('');
+      fetchTransactions(); // Refresh the list after adding
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+    }
+  };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            await fetch('http://localhost:5000/api/transactions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-            setFormData({ type: 'expense', amount: '', category: '', description: '' });
-            fetchData(); 
-        } catch (error) {
-            console.error("Failed to save transaction", error);
-        }
-    };
+  // Calculate totals
+  const totalIncome = transactions
+    .filter(t => t.type === 'income')
+    .reduce((acc, curr) => acc + curr.amount, 0);
+    
+  const totalExpense = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((acc, curr) => acc + curr.amount, 0);
+    
+  const balance = totalIncome - totalExpense;
 
-    // Animation variants for smooth loading
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        show: { opacity: 1, transition: { staggerChildren: 0.1 } }
-    };
-    const itemVariants = {
-        hidden: { y: 20, opacity: 0 },
-        show: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
-    };
-
-    return (
-        <div className="min-h-screen p-6 font-sans bg-slate-950 text-slate-200 md:p-12 selection:bg-indigo-500 selection:text-white">
-            <div className="max-w-5xl mx-auto">
-                
-                <motion.header 
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-3 mb-10"
-                >
-                    <div className="p-3 border bg-indigo-500/10 rounded-xl border-indigo-500/20">
-                        <Activity className="text-indigo-400" size={28} />
-                    </div>
-                    <h1 className="text-3xl font-bold text-transparent bg-gradient-to-r from-white to-slate-400 bg-clip-text">
-                        Smart Ledger
-                    </h1>
-                </motion.header>
-                
-                {/* Summary Cards */}
-                <motion.div 
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="grid grid-cols-1 gap-6 mb-10 md:grid-cols-3"
-                >
-                    <motion.div variants={itemVariants} className="bg-slate-900/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-[0_0_15px_rgba(34,197,94,0.05)] relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-green-400"></div>
-                        <p className="mb-1 text-sm font-medium text-slate-400">Total Income</p>
-                        <h2 className="text-3xl font-bold text-emerald-400">${data.summary.income.toFixed(2)}</h2>
-                    </motion.div>
-
-                    <motion.div variants={itemVariants} className="bg-slate-900/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-[0_0_15px_rgba(239,68,68,0.05)] relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 to-red-400"></div>
-                        <p className="mb-1 text-sm font-medium text-slate-400">Total Expenses</p>
-                        <h2 className="text-3xl font-bold text-rose-400">${data.summary.expense.toFixed(2)}</h2>
-                    </motion.div>
-
-                    <motion.div variants={itemVariants} className="bg-slate-900/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-[0_0_15px_rgba(99,102,241,0.05)] relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-blue-400"></div>
-                        <p className="mb-1 text-sm font-medium text-slate-400">Net Balance</p>
-                        <h2 className="text-3xl font-bold text-indigo-400">${data.summary.balance.toFixed(2)}</h2>
-                    </motion.div>
-                </motion.div>
-
-                <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-                    {/* Add Transaction Form */}
-                    <motion.div 
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="p-6 border lg:col-span-1 bg-slate-900/40 rounded-2xl border-slate-800 h-fit"
-                    >
-                        <h3 className="flex items-center gap-2 mb-5 text-lg font-semibold text-white">
-                            <Plus size={18} className="text-indigo-400"/> New Entry
-                        </h3>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block mb-1 ml-1 text-xs font-medium text-slate-400">Transaction Type</label>
-                                <select 
-                                    className="w-full p-3 transition-all border appearance-none bg-slate-950 border-slate-800 text-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                                    value={formData.type}
-                                    onChange={(e) => setFormData({...formData, type: e.target.value})}
-                                >
-                                    <option value="expense">Expense</option>
-                                    <option value="income">Income</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label className="block mb-1 ml-1 text-xs font-medium text-slate-400">Amount ($)</label>
-                                <input 
-                                    type="number" placeholder="0.00" 
-                                    className="w-full p-3 transition-all border bg-slate-950 border-slate-800 text-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 placeholder:text-slate-600" required
-                                    value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block mb-1 ml-1 text-xs font-medium text-slate-400">Category</label>
-                                <input 
-                                    type="text" placeholder="e.g. Groceries, Salary" 
-                                    className="w-full p-3 transition-all border bg-slate-950 border-slate-800 text-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 placeholder:text-slate-600" required
-                                    value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block mb-1 ml-1 text-xs font-medium text-slate-400">Description (Optional)</label>
-                                <input 
-                                    type="text" placeholder="Additional details..." 
-                                    className="w-full p-3 transition-all border bg-slate-950 border-slate-800 text-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 placeholder:text-slate-600"
-                                    value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})}
-                                />
-                            </div>
-
-                            <button className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-medium p-3 rounded-xl transition-colors mt-2 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-                                Save Transaction
-                            </button>
-                        </form>
-                    </motion.div>
-
-                    {/* Transaction List */}
-                    <motion.div 
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.4 }}
-                        className="p-6 border lg:col-span-2 bg-slate-900/40 rounded-2xl border-slate-800"
-                    >
-                        <h3 className="mb-5 text-lg font-semibold text-white">Recent Activity</h3>
-                        {data.transactions.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                                <Activity size={48} className="mb-4 opacity-20" />
-                                <p>No transactions yet. Add your first one!</p>
-                            </div>
-                        ) : (
-                            <ul className="space-y-3">
-                                {data.transactions.map((t, index) => (
-                                    <motion.li 
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.05 }}
-                                        key={t.id} 
-                                        className="flex items-center justify-between p-4 transition-colors border bg-slate-950/50 rounded-xl border-slate-800/50 hover:border-slate-700"
-                                    >
-                                        <div>
-                                            <p className="flex items-center gap-2 font-medium text-slate-200">
-                                                {t.category} 
-                                                {t.is_anomaly && (
-                                                    <span className="flex items-center gap-1 text-xs bg-rose-500/10 text-rose-400 px-2 py-0.5 rounded-full border border-rose-500/20">
-                                                        <AlertTriangle size={12} /> High Alert
-                                                    </span>
-                                                )}
-                                            </p>
-                                            {t.description && <p className="text-sm text-slate-500 mt-0.5">{t.description}</p>}
-                                        </div>
-                                        <div className="text-right">
-                                            <span className={`font-semibold text-lg ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                {t.type === 'income' ? '+' : '-'}${Number(t.amount).toFixed(2)}
-                                            </span>
-                                        </div>
-                                    </motion.li>
-                                ))}
-                            </ul>
-                        )}
-                    </motion.div>
-                </div>
+  return (
+    <div className="min-h-screen px-4 py-10 bg-gray-100 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto space-y-8">
+        
+        {/* Header & Dashboard */}
+        <div className="p-6 text-center bg-white shadow-lg rounded-xl">
+          <h1 className="mb-6 text-3xl font-bold text-gray-800">📊 Bytex Smart Ledger</h1>
+          
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="p-4 border border-blue-100 rounded-lg bg-blue-50">
+              <p className="text-sm font-semibold text-blue-600 uppercase">Total Balance</p>
+              <p className={`text-2xl font-bold ${balance >= 0 ? 'text-blue-900' : 'text-red-600'}`}>
+                ${balance.toFixed(2)}
+              </p>
             </div>
+            <div className="p-4 border border-green-100 rounded-lg bg-green-50">
+              <p className="text-sm font-semibold text-green-600 uppercase">Income</p>
+              <p className="text-2xl font-bold text-green-900">${totalIncome.toFixed(2)}</p>
+            </div>
+            <div className="p-4 border border-red-100 rounded-lg bg-red-50">
+              <p className="text-sm font-semibold text-red-600 uppercase">Expenses</p>
+              <p className="text-2xl font-bold text-red-900">${totalExpense.toFixed(2)}</p>
+            </div>
+          </div>
         </div>
-    );
+
+        {/* Add Transaction Form */}
+        <div className="p-6 bg-white shadow-lg rounded-xl">
+          <h2 className="mb-4 text-xl font-semibold text-gray-800">Add New Transaction</h2>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4 md:flex-row">
+            <input
+              type="text"
+              placeholder="Description (e.g., Salary, Rent)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="flex-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+            <input
+              type="number"
+              placeholder="Amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm md:w-32 focus:ring-blue-500 focus:border-blue-500"
+              required
+              min="0.01"
+              step="0.01"
+            />
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm md:w-32 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+            <button
+              type="submit"
+              className="px-6 py-2 font-bold text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700"
+            >
+              Add
+            </button>
+          </form>
+        </div>
+
+        {/* Transaction History */}
+        <div className="p-6 bg-white shadow-lg rounded-xl">
+          <h2 className="mb-4 text-xl font-semibold text-gray-800">Transaction History</h2>
+          {transactions.length === 0 ? (
+            <p className="py-4 text-center text-gray-500">No transactions logged yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {transactions.map((t, index) => (
+                <li 
+                  key={index} 
+                  className={`flex justify-between items-center p-4 rounded-md border-l-4 ${
+                    t.type === 'income' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'
+                  }`}
+                >
+                  <div>
+                    <p className="font-semibold text-gray-800">{t.description}</p>
+                    {/* Anomaly Detection Flag */}
+                    {t.type === 'expense' && t.amount > 1000 && (
+                      <span className="inline-block px-2 py-1 mt-1 text-xs font-bold text-red-800 bg-red-100 rounded">
+                        ⚠️ High Expense Anomaly
+                      </span>
+                    )}
+                  </div>
+                  <span className={`font-bold ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                    {t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
 }
+
+export default App;

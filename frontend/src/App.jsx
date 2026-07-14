@@ -18,9 +18,15 @@ function App() {
   const fetchTransactions = async () => {
     try {
       const response = await axios.get(API_URL);
-      setTransactions(response.data);
+      // Added safety check: ensure the response is an array before setting state
+      if (Array.isArray(response.data)) {
+        setTransactions(response.data);
+      } else {
+        setTransactions([]);
+      }
     } catch (error) {
       console.error('Error fetching transactions:', error);
+      setTransactions([]);
     }
   };
 
@@ -38,20 +44,20 @@ function App() {
       await axios.post(API_URL, newTransaction);
       setDescription('');
       setAmount('');
-      fetchTransactions(); // Refresh the list after adding
+      fetchTransactions(); 
     } catch (error) {
       console.error('Error adding transaction:', error);
     }
   };
 
-  // Calculate totals
-  const totalIncome = transactions
-    .filter(t => t.type === 'income')
-    .reduce((acc, curr) => acc + curr.amount, 0);
+  // Calculate totals safely
+  const totalIncome = Array.isArray(transactions) 
+    ? transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0) 
+    : 0;
     
-  const totalExpense = transactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc, curr) => acc + curr.amount, 0);
+  const totalExpense = Array.isArray(transactions) 
+    ? transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0) 
+    : 0;
     
   const balance = totalIncome - totalExpense;
 
@@ -87,7 +93,7 @@ function App() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 md:flex-row">
             <input
               type="text"
-              placeholder="Description (e.g., Salary, Rent)"
+              placeholder="Description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="flex-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -134,15 +140,7 @@ function App() {
                     t.type === 'income' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'
                   }`}
                 >
-                  <div>
-                    <p className="font-semibold text-gray-800">{t.description}</p>
-                    {/* Anomaly Detection Flag */}
-                    {t.type === 'expense' && t.amount > 1000 && (
-                      <span className="inline-block px-2 py-1 mt-1 text-xs font-bold text-red-800 bg-red-100 rounded">
-                        ⚠️ High Expense Anomaly
-                      </span>
-                    )}
-                  </div>
+                  <span className="font-semibold text-gray-800">{t.description}</span>
                   <span className={`font-bold ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                     {t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)}
                   </span>
